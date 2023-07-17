@@ -1,0 +1,529 @@
+---
+layout: post
+title: "QuizCraft: the frontend story"
+categories: joy-of-building quiz-craft
+date: 2023-07-17 21:00:00 +0200
+tags:
+    - elm
+    - auth0
+---
+
+# Quiz Craft: the frontend story
+
+My exposure to frontend has been minimal to say the least. I am knowledgeable about HTML and even had some CSS adventures as have most other people. More than a decade ago I used jQuery to create a dropdown menu for a summer project. Some simple browser games using vanilla Javascript were made. And that's about it. That is still enough exposure for a person like me to realize I would be setting myself up for a rather lengthy and unpleasant odyssey if I were to opt to polish up my Javascript skills or use one of many frameworks out there.
+
+Why not ask ChatGPT for Javascript alternatives? Most recommendations were frameworks (Django, Ruby on Rails, ...), but way down the list was a language called [Elm](https://elm-lang.org/). It describes itself as "A delightful language for reliable web applications". I was not sure if reliable and frontend would ever be allowed in a same sentence. I decided to give it a try.
+
+Turns out, I had a pleasant time using Elm. It fits my use case, which started out as "I don't want to waste time debugging Javascript". Elm catches a lot of errors with its functional style that one would make otherwise. The guides are among the best I have seen. Sure, it takes a good deal of hands on learning to get acquainted with the [Elm architecture](https://guide.elm-lang.org/architecture/), which is a cycle involving the three concepts of view, update and model. Another steep learning curve is how to go from a simple app to a single page application (SPA), if an SPA is even the right choice. Still, the syntax is oddly reassuring once you get into it. Refactoring did actually feel safe and fast, and not like opening a Pandora's box.
+
+One of the most alluring aspects was the idea of custom types and how they can aid in modeling some complex behaviour. There is an [excellent talk](https://www.youtube.com/watch?v=IcgmSRJHu_8) by Richard Feldman on this subject, which was an eye opener. I also appreciated the focus on data structures in [this talk](https://www.youtube.com/watch?v=XpDsk374LDE) by Elm's creator Evan Czaplicki.
+
+## The journey
+
+Going from next to no knowledge to being able to come up with a working MVP does not happen overnight. If I were to sum up my learning path, it would be an interplay between guides and immediately applying them in a blank slate project. The blank slate projects cannot be underestimated. Guides are crutches, and crutches will not always be present. The more you rely on crutches, the greater the fall will be when you do arrive at the gates named "Well, now let's use this for our case".
+
+As expected, we start with the Elm guides, and do every extra exercise mentioned in each part. Make that SVG clock, throw those double dice. Then make something yourself, a blank slate project. I made a simple TODO app, you can make it as complex as you like, as long as you start it from scratch. Think about your data structure, design your messages and link them with your view.
+
+Now do something bigger. For example, I wanted to incorporate Auth0 into my app, to get better acquainted with OAuth2. So we search and find that some preliminary guide is already [available](https://auth0.com/blog/creating-your-first-elm-app-part-2/). Alright, let's copy it, make a simple button and use ports to direct the user to the universal login page. It doesn't work, it was written for Elm 0.18 and we are using version 0.19. Fine, let's inspect the errors, do some console logging for the interop part and work our way through bit by bit, following the data through the app. A small handful of fixes got the job done. Store it [somewhere](https://github.com/avanderm/elm-auth0) alongside the observations. You just made progress.
+
+We can make simple projects and use Auth0. Now is the time to think bigger. A full fledged SPA seems scary, if there a framework? Ah, there's elm-spa, oh and a successor called elm-land. Alright, it has guides, let's go over them. Do some extras. Try using [elm-ui](https://package.elm-lang.org/packages/mdgriffith/elm-ui/latest/), and perhaps [elm-json-decode-pipeline](https://package.elm-lang.org/packages/NoRedInk/elm-json-decode-pipeline/latest/Json.Decode.Pipeline). Join the discord channel, search its history for issues you face. Check the Github issues, get out of your comfort zone. View some of the excellent talks present on [@ElmEurope](https://www.youtube.com/@ElmEurope) and [@elmconf](https://www.youtube.com/@elmconf).
+
+Now again, we incorporate Auth0. We face new challenges, but they are smaller thanks to the groundwork we laid earlier. We use elm-land's Auth module, we add ports and functions to the Effect modules for signing in and out. Elm is helping us along the way, pointing out our errors. Again we have [it working](https://github.com/avanderm/elm-land-auth0). Let's start adding our API calls to our backend. Slowly but steadily you get into the flow, scaffolding is the name of the game. Take your time, some directions will be dead ends, but even what does not work out still amounts to precious knowledge.
+
+## What did we end up using?
+
+We settled on using [elm-land](https://elm.land/) to skip the heavy lifting and rely on the expertise of people far better in this than we are. By making Auth0 work first with vanilla Elm and then elm-land we split the knowledge gaps into more manageable gaps to abridge. We used most of the features of elm-land, including the Shared, Effect and Auth modules. Also the layouts. We go a little deeper into some of the aspects below.
+
+We have a simple homepage, a games page where you can create new games and see your history and a game page for an individual game where you solve questions and see the summary if the game is finished.
+
+The product in development can be seen on [Github](https://github.com/brainfartlab/quizbot-frontend) and is hosted on [Netlify](https://www.netlify.com/). Here is the [result](https://quiz.dev.brainfartlab.com/).
+
+## Deep dives
+
+### The game page
+
+I had an epiphany using Elm. You see, I was struggling and getting worried over my update function for the game page. Let me tell you what was bothering me.
+
+The game page has a flow to it. When you create a game and go to its page, it will first load some game details (creation date, short hash, ...), no questions yet. When the loading finishes it makes a decision. Has the game ended yet? If so, display a questions summary, indicating which questions the player answered correctly. If the game has more unanswered questions, get the latest unanswered one and pose it to the player. The player gets the question alongside 4 options. The player selects an option and presses submit. The backend API sends back some feedback, indicating whether the player answered correctly or not. A next button appears to load the next question. If no questions remain, we load the summary as mentioned before.
+
+How do I model this? What does my data structure look like? Someone accustomed to Javascript or one of the frameworks may work with a big JSON object, storing everything there and only parts depending on what state the application is in. Elm however, offers you custom types. Here's what I settled on:
+
+{% highlight elm %}
+type Model
+    = Loading
+    | Loaded
+        { gameData : Api.Data Game
+        }
+    | LoadedQuestion
+        { game : Game
+        , questionData : Api.Data Question
+        , choice : Choice
+        }
+    | LoadedFeedback
+        { game : Game
+        , question : Question
+        , choice : Choice
+        , feedbackData : Api.Data Feedback
+        }
+    | GameOver
+        { game : Game
+        , summariesData : Api.Data (List QuestionSummary)
+        }
+{% endhighlight %}
+
+You can clearly see the progress I described here earlier. First we have nothing (Loading). Then we have some game details (Loaded). Then we have a question (LoadedQuestion) or a summary if the game is finished (GameOver). Then we have some feedback (LoadedFeedback). Then a new question (LoadedQuestion) or finished (GameOver).
+
+At first I got anxious over what this meant for my update function. Will this not result in some huge cartesian product of my messages and my models states like so:
+
+{% highlight elm %}
+type Choice
+    = Choice String
+    | NoChoice
+
+type Game = ...
+type Question = ...
+type Feedback = ...
+type QuestionSummary = ...
+
+type Msg
+    = ApiGameResponded (Result Error Game)
+    | ApiQuestionAskResponded (Result Error Question)
+    | ApiQuestionAnswerResponded (Result Error Feedback)
+    | ApiQuestionListResponded (Result Error (List QuestionSummary))
+    | MakeChoice Choice
+    | SubmitChoice
+    | NextQuestion
+    | FinishGame
+
+update : Auth.User -> Shared.Model -> Msg -> Model -> ( Model, Effect Msg )
+update user shared msg model =
+    case msg of
+        ... ->
+            ...
+
+        ApiQuestionAskResponded (Ok question) ->
+            case model of
+                LoadedGame { gameData } ->
+                    case gameData of ->
+                        Api.Success game ->
+                            ( LoadedQuestion
+                                { game = game
+                                , questionData = Api.Success question
+                                , choice = NoChoice
+                                }
+                            , Effect.none
+                            )
+
+                        _ ->
+                            ( model
+                            , Effect.none
+                            )
+
+                LoadedFeedback { game, _, _, _} ->
+                    ( LoadedQuestion
+                        { game = game
+                        , questionData = Api.Success question
+                        , choice = NoChoice
+                        }
+                    , Effect.none
+                    )
+
+                _ ->
+                    ( model
+                    , Effect.none
+                    )
+
+        NextQuestion ->
+            case model of
+                LoadedGame { gameData } ->
+                    case gameData of ->
+                        Api.Success game ->
+                            ( LoadedQuestion
+                                { game = game
+                                , questionData = Api.Loading
+                                , choice = NoChoice
+                                }
+                            , Api.Question.ask
+                                { onResponse = ApiQuestionAskResponded { game = game }
+                                , backendUri = shared.backendUri
+                                , token = user.token
+                                , gameId = game.id
+                                }
+                            )
+
+                        _ ->
+                            ( model
+                            , Effect.none
+                            )
+
+                LoadedFeedback { game, _, _, _} ->
+                    ( LoadedQuestion
+                        { game = game
+                        , questionData = Api.Loading
+                        , choice = NoChoice
+                        }
+                    , Effect.none
+                    )
+
+                _ ->
+                    ( model
+                    , Effect.none
+                    )
+
+        ... ->
+            ...
+{% endhighlight %}
+
+Things get bloated and ugly real fast. But then came the epiphany: that is what the view function is for. In the view you show UI elements dependent of the state of your model to progress to the next model state. And in doing so you pass the variables you know that new state needs. This means three things. First, your messages need to be smarter:
+
+{% highlight elm %}
+type Msg
+    = ApiGameResponded (Result Error Game)
+    | ApiQuestionAskResponded
+        { game : Game
+        } (Result Error Question)
+    | ApiQuestionAnswerResponded
+        { game : Game
+        , question : Question
+        , choice : Choice
+        } (Result Error Feedback)
+    | ApiQuestionListResponded
+        { game : Game
+        } (Result Error (List QuestionSummary))
+    | MakeChoice Choice
+    | SubmitChoice
+        { game : Game
+        , question : Question
+        } Choice
+    | NextQuestion
+        { game : Game
+        }
+    | FinishGame
+        { game : Game
+        }
+{% endhighlight %}
+
+This time, relevant data is passed through the message itself. This means we no longer have to iterate over our model state in the update function:
+
+{% highlight elm %}
+update : Auth.User -> Shared.Model -> Msg -> Model -> ( Model, Effect Msg )
+update user shared msg model =
+    case msg of
+        ... ->
+            ...
+
+        ApiQuestionAskResponded { game} (Ok question) ->
+            ( LoadedQuestion
+                { game = game
+                , questionData = Api.Success question
+                , choice = NoChoice
+                }
+            , Effect.none
+            )
+
+        NextQuestion { game } ->
+            ( LoadedQuestion
+                { game = game
+                , questionData = Api.Loading
+                , choice = NoChoice
+                }
+            , Api.Question.ask
+                { onResponse = ApiQuestionAskResponded { game = game }
+                , backendUri = shared.backendUri
+                , token = user.token
+                , gameId = game.id
+                }
+            )
+
+        ... ->
+            ...
+{% endhighlight %}
+
+We get the game data directly from the message. Thirdly, in the view function it means that only in the model states Loaded and LoadedFeedback, both of which have access to the game data, we construct the message NextQuestion passing it the game data. Nicely decoupled and the code is way cleaner. No need to overthink the update function. No need for a complex double loop in the update function.
+
+## Incorporating Auth0
+
+As expected, this is where Elm ports come in. Using elm-land this means we have an `interop.js` file:
+
+{% highlight js %}
+export const flags = ({ env }) => {
+  var profile = localStorage.profile
+  var token = localStorage.token
+
+  return {
+    user: (profile && token) ? {
+      profile: JSON.parse(profile),
+      token,
+    } : null,
+  }
+}
+
+export const onReady = ({ env, app }) => {
+  console.log(env);
+  var webAuth = new auth0.WebAuth({
+    domain: env.AUTH0_TENANT,
+    clientID: env.AUTH0_CLIENT_ID,
+    responseType: 'token',
+    redirectUri: `${env.URL}/callback`,
+  });
+
+  if (app.ports && app.ports.auth0authorize) {
+    app.ports.auth0authorize.subscribe((options) => {
+      webAuth.authorize({
+        audience: 'https://auth0-jwt-authorizer',
+      })
+    })
+  }
+
+  if (app.ports && app.ports.auth0logout) {
+    app.ports.auth0logout.subscribe(() => {
+      localStorage.removeItem('profile')
+      localStorage.removeItem('token')
+    })
+  }
+
+  webAuth.parseHash({ hash: window.location.hash }, (err, authResult) => {
+      ...
+      app.ports.auth0authResult.send(result);
+    }
+  })
+}
+{% endhighlight %}
+
+Tokens and profiles are stored in local storage and three ports are used. Two outgoing ports to authorize and log out from the Elm app, and one ingoing port to receive the authentication result from Auth0 into the Elm app.
+
+We defined the outgoing ports in `Effect.elm`:
+
+{% highlight elm %}
+-- SHARED
+
+
+signIn : Maybe String -> Effect msg
+signIn redirectPath =
+    SendSharedMsg (Shared.Msg.AuthenticationMsg (Auth.Authentication.LogIn redirectPath))
+
+signOut : Effect msg
+signOut =
+    SendSharedMsg (Shared.Msg.AuthenticationMsg Auth.Authentication.LogOut)
+
+
+-- PORTS
+
+
+port auth0authorize : Auth.Auth0.Options -> Cmd msg
+port auth0logout : () -> Cmd msg
+{% endhighlight %}
+
+The `Auth.Authentication` and `Auth.Auth0` modules are straight up copies from the [Auth0 documentation](https://auth0.com/blog/creating-your-first-elm-app-part-2/). The local storage data passed in the `interop.js` files gets piped into `Shared.elm` as app flags:
+
+{% highlight elm %}
+type alias Flags =
+    { user : Maybe Auth.Auth0.LoggedInUser
+    }
+
+
+-- INIT
+
+
+init : Result Json.Decode.Error Flags -> Route () -> ( Model, Effect Msg )
+init flagsResult route =
+    let
+        flags : Flags
+        flags =
+            flagsResult
+                |> Result.withDefault { user = Nothing }
+    in
+    ( { authModel = (Auth.Authentication.init Effect.auth0authorize Effect.auth0logout flags.user)
+      }
+    , Effect.none
+    )
+{% endhighlight %}
+
+You also see we pass the outgoing ports from the `Effect` module into the `Auth.Authentication` module. The one ingoing port is also defined in `Shared.elm`:
+
+{% highlight elm %}
+-- PORTS
+
+
+port auth0authResult : (Auth.Auth0.RawAuthenticationResult -> msg) -> Sub msg
+{% endhighlight %}
+
+And we also link up the message from the `Effect` module functions `signIn` and `signOut` here with the `Auth.Authentication` module:
+
+{% highlight elm %}
+update : Route () -> Msg -> Model -> ( Model, Effect Msg )
+update route msg model =
+    case msg of
+        Shared.Msg.AuthenticationMsg authMsg ->
+            let
+                ( authModel, cmd ) =
+                    Auth.Authentication.update authMsg model.authModel
+            in
+            ( { model | authModel = authModel }
+            , Effect.sendCmd (Cmd.map Shared.Msg.AuthenticationMsg cmd)
+            )
+{% endhighlight %}
+
+With the shared model being updated now when authentication comes in from the port we can use this in the `Auth.elm` module to redirect when either the user if not logged in or when the token has expired:
+
+{% highlight elm %}
+type alias User =
+    Auth.Auth0.LoggedInUser
+
+onPageLoad : Shared.Model -> Route () -> Auth.Action.Action User
+onPageLoad shared route =
+    case shared.authModel.state of
+        Auth.Auth0.LoggedIn user ->
+            case route.path of
+                Route.Path.Callback ->
+                    Auth.Action.pushRoute
+                        { path = Route.Path.Home_
+                        , query =
+                            Dict.empty
+                        , hash = Nothing
+                        }
+
+                _ ->
+                    Auth.Action.loadPageWithUser user
+
+        Auth.Auth0.LoggedOut ->
+            case route.path of
+                Route.Path.Callback ->
+                    Auth.Action.showLoadingPage View.none
+
+                _ ->
+                    Auth.Action.pushRoute
+                        { path = Route.Path.SignIn
+                        , query =
+                            Dict.fromList
+                                [ ( "from", route.url.path )
+                                ]
+                        , hash = Nothing
+                        }
+{% endhighlight %}
+
+To summarize, if the user is logged out and the user is visiting an "auth-only" pages they will be redirected to the sign in page. On the sign in page, we call `Effect.signIn` which goes through the outgoing port and loads the Auth0 universal login page. The redirection URI will be the `callback` page. We then use the `Auth.Action.showLoadingPage` to display nothing until the token has been loaded. At that point the user is logged in and the app redirects to the homepage. In the future we will adapt this to redirect back to the "auth-only" page.
+
+One last thing: in the Elm app we can be in a `LoggedIn` state but with an expired token. We adapted the `Api.elm` module from the elm-land documentation and included a custom error for unauthorized access (401 Unauthorized):
+
+{% highlight elm %}
+type Error
+    = UnAuthorized
+    | Feedback (List ServiceError)
+
+handleHttpResponse : Decoder a -> Http.Response String -> Result Error a
+handleHttpResponse aDecoder response =
+    case response of
+        ... ->
+            ...
+
+        Http.BadStatus_ { statusCode } body ->
+            case statusCode of
+                401 ->
+                    Err UnAuthorized
+
+                _ ->
+                    ...
+{% endhighlight %}
+
+We subsequently use this error in our page modules to call `Effect.signOut`. For example
+
+{% highlight elm %}
+update : Auth.User -> Shared.Model -> Msg -> Model -> ( Model, Effect Msg )
+update user shared msg model =
+    case msg of
+        ... ->
+            ...
+
+        ApiQuestionAskResponded { game} (Err error) ->
+            case error of
+                Api.UnAuthorized ->
+                    ( model
+                    , Effect.signOut
+                    )
+
+                errors ->
+                    ( Loaded { gameData = Api.Failure errors }
+                    , Effect.none
+                    )
+
+        ... ->
+            ...
+{% endhighlight %}
+
+## Waiting for the quiz
+
+In one of the first iterations we just generated a new question on the fly every time, having the user wait a few seconds for the response of the REST calls. In a later stage we create questions asynchronously in one go when the game was created, which takes about 2-3 minutes. This meant that as a player creates a game they can visit the game page without there being any questions stored yet on the backend side. We need to give some status update on the creation of the game questions and start loading the first question when they are available. I did not want to take the Process.sleep route and decided to simply leverage subscriptions depending on the model state:
+
+{% highlight elm %}
+-- UPDATE
+update : Auth.User -> Shared.Model -> Msg -> Model -> ( Model, Effect Msg )
+update user shared msg model =
+    case msg of
+        ... ->
+            ...
+
+        ApiGameResponded (Ok game) ->
+            ( Loaded
+                { gameData = Api.Success game
+                }
+            , case game.status of
+                Api.Game.PENDING ->
+                    Effect.none
+
+                Api.Game.READY ->
+                    Api.Question.ask
+                        { onResponse = ApiQuestionAskResponded { game = game }
+                        , backendUri = shared.backendUri
+                        , token = user.token
+                        , gameId = game.id
+                        }
+
+                Api.Game.FINISHED ->
+                    Api.Question.list
+                        { onResponse = ApiQuestionListResponded { game = game }
+                        , backendUri = shared.backendUri
+                        , token = user.token
+                        , gameId = game.id
+                        }
+            )
+
+        ReloadGame game _ ->
+            ( model
+            , Api.Game.get
+                { onResponse = ApiGameResponded
+                , backendUri = shared.backendUri
+                , token = user.token
+                , id = game.id
+                }
+            )
+
+
+-- SUBSCRIPTIONS
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    case model of
+        Loaded { gameData } ->
+            case gameData of
+                Api.Success game ->
+                    case game.status of
+                        Api.Game.PENDING ->
+                            Time.every 30000 (ReloadGame game)
+
+                        _ ->
+                            Sub.none
+
+                _ ->
+                    Sub.none
+
+        _ ->
+            Sub.none
+{% endhighlight %}
+
+Thus, every 30 seconds, the REST call for the game status is polled and we proceed to the loading of the first question once it is in "READY" status. As I am sure the code can be cleaned up further I figure this a road of less resistance to accomplish the waiting functionality.
+
+## Wrap up
+
+The foundation has been laid for the quiz app frontend using Elm, incorporating Auth0 for authentication. While it is not the prettiest thing to look at in its current form, it is functional and working and Elm offers a reassurance that our app will have good uptime.

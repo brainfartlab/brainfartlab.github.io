@@ -28,15 +28,12 @@ github_username: brainfartlab
 
 # Build settings
 theme: jekyll-theme-midnight
-gems:
-  - jekyll-paginate-v2
 plugins:
   - jekyll-feed
   - jekyll-sitemap
+  - jekyll-paginate
 
-pagination:
-  enabled: true
-  per_page: 10
+paginate: 10
 
 # Exclude from processing.
 # The following items will not be processed, by default.

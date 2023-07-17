@@ -241,7 +241,7 @@ update user shared msg model =
 
 We get the game data directly from the message. Thirdly, in the view function it means that only in the model states Loaded and LoadedFeedback, both of which have access to the game data, we construct the message NextQuestion passing it the game data. Nicely decoupled and the code is way cleaner. No need to overthink the update function. No need for a complex double loop in the update function.
 
-## Incorporating Auth0
+### Incorporating Auth0
 
 As expected, this is where Elm ports come in. Using elm-land this means we have an `interop.js` file:
 
@@ -451,7 +451,7 @@ update user shared msg model =
             ...
 {% endhighlight %}
 
-## Waiting for the quiz
+### Waiting for the quiz
 
 In one of the first iterations we just generated a new question on the fly every time, having the user wait a few seconds for the response of the REST calls. In a later stage we create questions asynchronously in one go when the game was created, which takes about 2-3 minutes. This meant that as a player creates a game they can visit the game page without there being any questions stored yet on the backend side. We need to give some status update on the creation of the game questions and start loading the first question when they are available. I did not want to take the Process.sleep route and decided to simply leverage subscriptions depending on the model state:
 

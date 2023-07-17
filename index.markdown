@@ -6,20 +6,27 @@ layout: page
 ---
 
 <!-- This loops through the paginated posts -->
-<ul class="post-list">
-  <!--
-      Here is the main paginator logic called.
-      All calls to site.posts should be replaced by paginator.posts
-  -->
-  {% for post in paginator.posts %}
-    <li>
-      <span class="post-meta">{{ post.date | date: "%b %-d, %Y" }}</span>
+{% for post in paginator.posts %}
+  <h1><a href="{{ post.url }}">{{ post.title }}</a></h1>
+  <p class="author">
+    <span class="date">{{ post.date }}</span>
+  </p>
+{% endfor %}
 
-      <h2>
-        <a class="post-link" href="{{ post.url | relative_url }}">{{ post.title | escape }}</a>
-      </h2>
-    </li>
-  {% endfor %}
+<ul class="post-list">
+    <!--
+        Here is the main paginator logic called.
+        All calls to site.posts should be replaced by paginator.posts
+    -->
+    {% for post in paginator.posts %}
+      <li>
+        <span class="post-meta">{{ post.date | date: "%b %-d, %Y" }}</span>
+
+        <h2>
+          <a class="post-link" href="{{ post.url | relative_url }}">{{ post.title | escape }}</a>
+        </h2>
+      </li>
+    {% endfor %}
 </ul>
 
 <!-- Pagination links -->

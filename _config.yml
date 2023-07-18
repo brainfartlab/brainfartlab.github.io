@@ -27,7 +27,7 @@ url: "https://blog.brainfartlab.com" # the base hostname & protocol for your sit
 github_username: brainfartlab
 linkedin_username: antoinevandermeersch
 
-google_analytics: UA-175911617-1
+google_analytics: G-3LFBC4G45Q
 
 # Build settings
 theme: jekyll-theme-midnight

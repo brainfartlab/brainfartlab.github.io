@@ -1,0 +1,243 @@
+---
+layout: post
+title: "QuizCraft: the backend story"
+categories: joy-of-building quiz-craft
+date: 2023-07-18 21:00:00 +0200
+tags:
+    - aws
+    - auth0
+    - jwt
+    - serverless
+    - lambda
+    - sqs
+    - api-gateway
+    - route53
+    - dynamodb
+    - control-tower
+---
+
+# Quiz Craft: the backend story
+
+Most of my experience is related to backend. As such I will not be documenting my learning journey towards fulfilling my implementation. I will however include some deep dives covering some new aspects of AWS encountered during development.
+
+Our implementation for the quiz backend is simple: a REST API hosted on AWS API Gateway backed by Lambda, with data stored in DynamoDB for quick retrieval. In its current form, the quiz app has no need for more specific features offered by other API types. Some heavier workloads are completed asynchronously using SQS and more Lambda functions. The setup is serverless since it is a pet project and the API will be called sparingly, latency is not critical. The architecture will be specified using CDK TypeScript, the Lambda functions will be written in Python.
+
+We are adding some extra learning challenges by using a multi-account setup, managed by AWS Control Tower. Separate accounts will be provisioned for the tst, dev and prd environment of brainfartlab projects. A centralized AWS account for networking in my "organization" will host the Route53 zone for brainfartlab and a deployment account will host the CI/CD pipeline to deploy to the dev and prd environments. I like to deploy to my tst environment manually to get faster feedback (e.g. using hotswapping of Lambda code).
+
+For a lot of the Python code I decided to include unit tests very early on, despite this being a simple pet project. I tend to do this often for a language such as Python, given it is not statically typed. I often fuss over the design, prompting many rewrites and refactoring rounds, which I know will introduce many errors. Starting with unit tests early for Python saves me more time in the long run. I would also like to point to [a great resource](https://cjolowicz.github.io/posts/hypermodern-python-01-setup/) I have been using for many years that inspires the way I write my Python code.
+
+The code for the backend architecture and Lambda functions is bundled [here](https://github.com/brainfartlab/ai-quiz). For this project I gravitated towards using constructs more often to avoid long worksheet-like CDK stacks.
+
+## Deep dives
+
+### Development: API Gateway JWT Authorizers
+
+In the [frontend]({% post_url joy-of-building/quiz-craft/2023-07-17-frontend %}) story we added authentication using Auth0. We will have to sync up the backend to check the JWT tokens. In the past this meant writing a custom authorizer Lambda used by API Gateway. These days, API Gateway has configurable [JWT authorizers](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html) you just need to feed the audience and issuer URL. The CDK code:
+
+{% highlight ts %}
+const authorizer = new authorizers.HttpJwtAuthorizer('JwtAuthorizer', Auth0Settings.ISSUER_URL, {
+  identitySource: ['$request.header.Authorization'], // Token is passed using the Authorization header
+  jwtAudience: [Auth0Settings.AUDIENCE_URL],
+});
+
+const httpApi = new apigw2.HttpApi(this, 'HttpApi', {
+  corsPreflight: {
+    allowHeaders: [
+      'authorization',
+      'content-type',
+      '*',
+    ],
+    allowMethods: [
+      apigw2.CorsHttpMethod.GET,
+      apigw2.CorsHttpMethod.POST,
+      apigw2.CorsHttpMethod.PUT,
+    ],
+    allowOrigins: [
+      props.origin, // The frontend URL
+    ],
+  },
+  createDefaultStage: false,
+  defaultAuthorizer: authorizer,
+});
+{% endhighlight %}
+
+One hurdle was to ensure the JWT tokens sent by the frontend are in the right format, meaning a three-part string joined by a period. So check that the audience URL is the same for frontend and backend. Otherwise you will notice API Gateway throwing errors stating that the token contains an invalid number of segments. In our case the audience URL had to be added in the authorizing section of `interop.js`:
+
+{% highlight js %}
+app.ports.auth0authorize.subscribe((options) => {
+  webAuth.authorize({
+    audience: 'https://auth0-jwt-authorizer',
+  })
+})
+{% endhighlight %}
+
+In the Lambda app we use the token to retrieve the email of the user, hash it and use it to personalize user's content. To avoid Auth0 rate limiting we store the association in a DynamoDB table with a time-to-live (TTL) attribute:
+
+{% highlight python %}
+from dataclasses import dataclass
+import hashlib
+import urllib
+
+from auth0.authentication import Users
+
+
+@dataclass
+class Player:
+    player_id: str
+
+
+def get_player(event) -> Player:
+    global gateway // gateway object to interact with AWS resources
+
+    domain = urllib.parse.urlparse(event.request_context.authorizer.jwt_claim["iss"])
+    token = event.get_header_value("Authorization").split(" ")[-1]
+
+    try:
+        return gateway.get_player_by_token(token) // query from cache
+    except UnknownToken:
+        users = Users(domain.netloc)
+        user = users.userinfo(token)
+
+        player_id = hash(user["email"]) // we use a hashing function to obfuscate the email
+        player = Player(player_id)
+        gateway.store_player_by_token(token, player)
+
+        return player
+{% endhighlight %}
+
+### Development: AWS Lambda Powertools
+
+[AWS Lambda Powertools](https://docs.powertools.aws.dev/lambda/python/latest/) has helped me throughout the years to avoid cumbersome JSON parsing and extraction of input events and up to now it has been spared from becoming bloated. It's neat to take care of event processing logic as well as API Gateway messages. We went further for the project and used functionality to translate our custom Python exceptions into API status codes:
+
+{% highlight python %}
+from aws_lambda_powertools.event_handler import Response
+from aws_lambda_powertools.event_handler.exceptions import NotFoundError
+
+@app.exception_handler(NoSuchGame)
+def handle_game_not_found(ex: NoSuchGame):
+    raise NotFoundError
+
+
+@app.exception_handler(NoSuchQuestion)
+def handle_question_not_found(ex: NoSuchQuestion):
+    raise NotFoundError
+
+
+@app.exception_handler(InvalidGame)
+def handle_invalid_game(ex: InvalidGame):
+    return Response(
+        status_code=400,
+        content_type=content_types.APPLICATION_JSON,
+        body=json.dumps(ex.to_json()),
+    )
+
+
+@app.exception_handler(QuestionsLimitReached)
+def handle_questions_limit_reached(ex: QuestionsLimitReached):
+    game_id = ex.game.game_id
+    questions_limit = ex.game.questions_limit
+
+    message = f"Game {game_id} has reached questions limit of {questions_limit}"
+
+    return Response(
+        status_code=400,
+        content_type=content_types.APPLICATION_JSON,
+        body=json.dumps({"errors": [{"message": message}]}),
+    )
+{% endhighlight %}
+
+For any new internal server errors we bump into we can refactor to include exception handling or passing it further with a proper API status code to the client.
+
+### Architecture: CDK bootstrapping
+
+Knowledge can be lost, especially when tied to infrequent usage. Even though automation is most useful for highly repetitive tasks, it can always be a vehicle for knowledge preservation concerning rare but critical tasks. AWS Control Tower helps me provision accounts, and when provisioned the idea is to able to jump right into development, deploying CDK projects. That requires the account to be bootstrapped, and for this we use CloudFormation stacksets, which is just a CloudFormation template that automatically gets deployed to organizational units (OUs) of my choosing.
+
+The flexibility also allows me to deploy the bootstrap stack with different CloudFormation parameters depending on the account. This is a handy feature we use for making our dev and prd account trust a secondary CI/CD account, enabling the CI/CD account to deploy to these environment accounts. For this, I can simply refer to these excellent posts and docs:
+
+- [Bootstrapping multiple AWS accounts for AWS CDK using CloudFormation StackSets](https://aws.amazon.com/blogs/mt/bootstrapping-multiple-aws-accounts-for-aws-cdk-using-cloudformation-stacksets/)
+- [Override parameters on stack instances](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/stackinstances-override.html)
+
+### Architecture: Route 53
+
+We have a centralized networking account in our AWS organization where we deploy hosted zones. This includes the `brainfartlab.com` domain. However, we want the flexibility to decentralize parts across the accounts associated with the different environments. Since Route53 is a DNS service and DNS a distributed, hierarchical database ([Computer Networking - Kurose, Ross](https://gaia.cs.umass.edu/kurose_ross/eighth.php)) this means our hosted zone can simple refer to DNS name servers hosted on other AWS accounts to take of subdomain queries.
+
+Thus, our dev environment account will have a DNS hosted zone for `dev.brainfartlab.com` and the DNS service for `brainfartlab.com` needs to refer queries for that subdomain to the name servers created by Route 53 for the `dev.brainfartlab.com` hosted zone.
+
+In the CDK stack for the dev and prd environments we will have the Route 53 hosted zone for the subdomain:
+
+{% highlight ts %}
+const environmentDomainName = `${props.environment}.${DomainSettings.domainName}`;
+
+const hostedZone = new route53.HostedZone(this, 'HostedZone', {
+  zoneName: environmentDomainName,
+});
+
+// For HTTPS
+const certificate = new acm.Certificate(this, 'Certificate', {
+  domainName: `*.${hostedZone.zoneName}`,
+  certificateName: 'BrainFartLab Service',
+  validation: acm.CertificateValidation.fromDns(hostedZone),
+});
+
+// API Gateway domain name
+const domainName = new apigw2.DomainName(this, 'DomainName', {
+  domainName: `api.${environmentDomainName}`,
+  certificate,
+});
+
+// BrainFartLab API
+new route53.CnameRecord(this, 'ApiRecordSet', {
+  zone: hostedZone,
+  recordName: `api.${environmentDomainName}`,
+  domainName: domainName.regionalDomainName,
+});
+{% endhighlight %}
+
+We can stack different BrainFartLab related projects on top of this API URI using API Gateway base domains as follows:
+
+{% highlight ts %}
+// BrainFartLab API
+const apiDomainName = `api.${props.environment}.${DomainSettings.domainName}`;
+
+const domainName = apigw2.DomainName.fromDomainNameAttributes(this, 'DomainName', {
+  name: apiDomainName,
+  regionalDomainName: DomainSettings.regionalDomainName,
+  regionalHostedZoneId: DomainSettings.regionalHostedZoneId,
+});
+
+// Quiz API is "mounted" onto api.dev.brainfartlab.com/quiz
+new apigw2.ApiMapping(this, 'QuizApiMapping', {
+  api: props.api, // IHttpApi
+  apiMappingKey: 'quiz',
+  domainName,
+  stage: props.stage, // HttpStage
+});
+{% endhighlight %}
+
+If in the future we need to reuse our API domain name for a new project we can easily stack it on top, as long as we avoid the already taken "quiz" space.
+
+In the centralized AWS account we just need to add the name servers created by Route 53 for our nested domain as a NS record:
+
+{% highlight ts %}
+const hostedZone = new route53.HostedZone(this, 'BFLZone', {
+  zoneName: 'brainfartlab.com',
+});
+
+new route53.NsRecord(this, 'BFLZone-dev', {
+  recordName: 'dev.brainfartlab.com',
+  ttl: cdk.Duration.seconds(172800),
+  values: [
+    'ns-...co.uk.',
+    'ns-...net.',
+    'ns-...org.',
+    'ns-...com.',
+  ],
+  zone: hostedZone,
+});
+{% endhighlight %}
+
+## Wrap up
+
+Our environments are fully segregated into their respective AWS accounts, with a CodePipeline in a CI/CD account overseeing deployments. Our DNS records for each subdomain are neatly organized in their own respective AWS accounts.
+
+Perhaps at a later stage we may opt to transition to a different API. For example, if we want a competitive multiplayer experience we may opt for a Web Sockets approach to allow for bidirectional communication. Or if we start adding additional quiz types and relations between objects GraphQL may alleviate the need to sync up between frontend and backend, allowing frontend to design their own queries to select whatever data they require to show.

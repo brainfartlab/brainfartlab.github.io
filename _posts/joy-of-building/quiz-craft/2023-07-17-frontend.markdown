@@ -24,15 +24,17 @@ Going from next to no knowledge to being able to come up with a working MVP does
 
 As expected, we start with the Elm guides, and do every extra exercise mentioned in each part. Make that SVG clock, throw those double dice. Then make something yourself, a blank slate project. I made a simple TODO app, you can make it as complex as you like, as long as you start it from scratch. Think about your data structure, design your messages and link them with your view.
 
-Now do something bigger. For example, I wanted to incorporate Auth0 into my app, to get better acquainted with OAuth2. So we search and find that some preliminary guide is already [available](https://auth0.com/blog/creating-your-first-elm-app-part-2/). Alright, let's copy it, make a simple button and use ports to direct the user to the universal login page. It doesn't work, it was written for Elm 0.18 and we are using version 0.19. Fine, let's inspect the errors, do some console logging for the interop part and work our way through bit by bit, following the data through the app. A small handful of fixes got the job done. Store it [somewhere](https://github.com/avanderm/elm-auth0) alongside the observations. You just made progress.
+Now do something bigger. For example, I wanted to incorporate Auth0 into my app, to get better acquainted with OAuth2. So we search and find that some preliminary guide is already [available](https://auth0.com/blog/creating-your-first-elm-app-part-2/). Alright, let's copy it, make a simple button and use ports to direct the user to the universal login page. We code the bare essentials and find out it doesn't work, it was written for Elm 0.18 and we are using version 0.19. Fine, let's inspect the errors, do some console logging for the interop part and work our way through bit by bit, following the data through the app. A small handful of fixes got the job done. Store it [somewhere](https://github.com/avanderm/elm-auth0) alongside the observations. You just made progress.
 
 We can make simple projects and use Auth0. Now is the time to think bigger. A full fledged SPA seems scary, if there a framework? Ah, there's elm-spa, oh and a successor called elm-land. Alright, it has guides, let's go over them. Do some extras. Try using [elm-ui](https://package.elm-lang.org/packages/mdgriffith/elm-ui/latest/), and perhaps [elm-json-decode-pipeline](https://package.elm-lang.org/packages/NoRedInk/elm-json-decode-pipeline/latest/Json.Decode.Pipeline). Join the discord channel, search its history for issues you face. Check the Github issues, get out of your comfort zone. View some of the excellent talks present on [@ElmEurope](https://www.youtube.com/@ElmEurope) and [@elmconf](https://www.youtube.com/@elmconf).
 
-Now again, we incorporate Auth0. We face new challenges, but they are smaller thanks to the groundwork we laid earlier. We use elm-land's Auth module, we add ports and functions to the Effect modules for signing in and out. Elm is helping us along the way, pointing out our errors. Again we have [it working](https://github.com/avanderm/elm-land-auth0). Let's start adding our API calls to our backend. Slowly but steadily you get into the flow, scaffolding is the name of the game. Take your time, some directions will be dead ends, but even what does not work out still amounts to precious knowledge.
+Once again, we incorporate Auth0, this time into elm-land. We face new challenges, but they are smaller thanks to the groundwork we laid earlier. We use elm-land's Auth module, we add ports and functions to the Effect modules for signing in and out. Elm is helping us along the way, pointing out our errors. Again we have [it working](https://github.com/avanderm/elm-land-auth0). Let's start adding our API calls to our backend. Slowly but steadily you get into the flow, scaffolding is the name of the game. Take your time, some directions will be dead ends, but even what does not work out still amounts to precious knowledge.
 
 ## What did we end up using?
 
 We settled on using [elm-land](https://elm.land/) to skip the heavy lifting and rely on the expertise of people far better in this than we are. By making Auth0 work first with vanilla Elm and then elm-land we split the knowledge gaps into more manageable gaps to abridge. We used most of the features of elm-land, including the Shared, Effect and Auth modules. Also the layouts. We go a little deeper into some of the aspects below.
+
+Among the additional modules are elm-ui](https://package.elm-lang.org/packages/mdgriffith/elm-ui/latest/) for styling without CSS and [elm-json-decode-pipeline](https://package.elm-lang.org/packages/NoRedInk/elm-json-decode-pipeline/latest/Json.Decode.Pipeline) for the many JSON messages that require encoding and decoding.
 
 We have a simple homepage, a games page where you can create new games and see your history and a game page for an individual game where you solve questions and see the summary if the game is finished.
 
@@ -44,7 +46,7 @@ The product in development can be seen on [Github](https://github.com/brainfartl
 
 I had an epiphany using Elm. You see, I was struggling and getting worried over my update function for the game page. Let me tell you what was bothering me.
 
-The game page has a flow to it. When you create a game and go to its page, it will first load some game details (creation date, short hash, ...), no questions yet. When the loading finishes it makes a decision. Has the game ended yet? If so, display a questions summary, indicating which questions the player answered correctly. If the game has more unanswered questions, get the latest unanswered one and pose it to the player. The player gets the question alongside 4 options. The player selects an option and presses submit. The backend API sends back some feedback, indicating whether the player answered correctly or not. A next button appears to load the next question. If no questions remain, we load the summary as mentioned before.
+The game page has a flow to it. When you create a game and go to its page, it will first load some game details (creation date, short hash, ...), no questions yet. When the loading finishes it makes a decision. Has the game ended yet? If so, display a questions summary, indicating which questions the player answered correctly. If the game has more unanswered questions, get the latest unanswered one and pose it to the player. The player gets the question alongside 4 options. The player selects an option and presses submit. The backend API sends back some feedback, indicating whether the player answered correctly or not. A next button appears so the player can load the next question. If no questions remain, we load the summary as mentioned before.
 
 How do I model this? What does my data structure look like? Someone accustomed to Javascript or one of the frameworks may work with a big JSON object, storing everything there and only parts depending on what state the application is in. Elm however, offers you custom types. Here's what I settled on:
 
@@ -364,7 +366,7 @@ update route msg model =
             )
 {% endhighlight %}
 
-With the shared model being updated now when authentication comes in from the port we can use this in the `Auth.elm` module to redirect when either the user if not logged in or when the token has expired:
+With the shared model being updated now when authentication comes in from the port we can use this in the `Auth.elm` module to redirect when either the user is not logged in or when the token has expired:
 
 {% highlight elm %}
 type alias User =

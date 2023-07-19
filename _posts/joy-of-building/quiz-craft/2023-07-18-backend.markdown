@@ -14,6 +14,8 @@ tags:
     - route53
     - dynamodb
     - control-tower
+    - python
+    - typescript
 ---
 
 # Quiz Craft: the backend story

@@ -226,7 +226,7 @@ Currently, an LLM may come up with questions working from the assumption that th
 
 ### Relevancy
 
-We discussed filtering out irrelevant documents before, but perhaps we should take the Wikipedia approach with their "disambiguation" pages. If they provide "Steve Carl" as a keyword, they're referring to a wrester, not to the show "Family Matters" with two characters named Steve (Urkel) and Carl.
+We discussed filtering out irrelevant documents before, but perhaps we should take the Wikipedia approach with their "disambiguation" pages. If a player provides "Steve Carl" as a keyword, they're likely referring to a wrester, not to the show "Family Matters" with two characters named Steve (Urkel) and Carl.
 
 ### Less wrong wrong answers
 

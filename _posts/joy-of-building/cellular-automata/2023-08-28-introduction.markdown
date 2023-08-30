@@ -40,3 +40,8 @@ In my university days I had already had some run-ins with cellular automata. In 
 I wanted to know more about the theory behind it, and luck has it that Wolfram himself published his work for free [online](https://www.wolframscience.com/nks/). These documents will form the base to branch out of, and in subsequent blog posts we intend to not only learn, but create interactive demos for others to explore.
 
 So without further ado, let's kick off an iterative process of reading, followed by implementation and experimentation. We will add links here over time to document out progress.
+
+| Class | Vault | Article |
+|-------|-------|---------|
+| simple | [Link](https://vault.dev.brainfartlab.com/cellular-automata/nks/simple/) | WIP |
+| mobile | [Link](https://vault.dev.brainfartlab.com/cellular-automata/nks/mobile/) | WIP |

@@ -11,7 +11,7 @@ tags:
 
 # Overlord: my personal BC/DR
 
-As a freelancer you are responsible for your own "IT landscape", and you can choose to design your own BC/DR (business continuity / disaster recovery) solution however way you prefer. A while ago, my mini-computer had a rocky boot and it dawned on me I had not put enough thought into my BC/DR setup. If my machine were kick the proverbial bucket, the loss would include:
+As a freelancer you are responsible for your own "IT landscape", and you can choose to design your own BC/DR (business continuity / disaster recovery) solution however way you prefer. A while ago, my mini-computer had a rocky boot and it dawned on me I had not put enough thought into my BC/DR setup. If my machine were to kick the proverbial bucket, the loss would include:
 
 - a lot of data
 - passwords in my keychain
@@ -19,7 +19,7 @@ As a freelancer you are responsible for your own "IT landscape", and you can cho
 
 You can now understand the two parts: business continuity means that if a machine goes down, I want to be able to continue work to the best of my ability as fast as possible on a new machine. That means I need to be able to get a new machine up and running fast without having to configure and reinvent the wheel.
 
-The disaster recovery part deals with minimizing your data loss and restoring it. Not all data must be restored in order to continue working on any current tasks, hence the split. Disaster might struck during the day, if you can just focus on work for the rest of the day(= business continuity), you can restore all remaining missing data in the evening, when issues peter down.
+The disaster recovery part deals with minimizing your data loss and restoring it. Not all data must be restored in order to continue working on any current tasks, hence the split. Disaster might struck during the day, if you can just focus on work for the rest of the day (= business continuity), you can restore all remaining missing data in the evening, when issues peter down.
 
 In BC/DR, we often talk of the RTO (recovery time objective) and RPO (recovery point objective). The RTO is the time required to resume business critical operations whilst the RPO relates to the amount of data loss expected. In our case we strive to hit a RTO and RPO of < 1 hour.
 
@@ -29,9 +29,9 @@ The RPO is a little odd to express in time units, but you can reason about it us
 
 ### Hardware
 
-There's an underutilised Synology NAS (network attached storage) backup station whirring peacefully in my meter room. It was intended to use as a backup, but complacency decided otherwise. With some automation we can schedule backups every hour. There are existing cloud solutions, but I wish to keep any sensitive data local. Keeping it local also ensures we are not at the mercy of an internet blackout. This will constitute our disaster recovery.
+There's an underutilised Synology NAS (network attached storage) backup station whirring peacefully in my meter room. It was intended to be used as a backup, but complacency decided otherwise. With some automation we can schedule backups every hour. There are existing cloud solutions, but I wish to keep any sensitive data local. Keeping it local also ensures we are not at the mercy of an internet blackout. This will constitute our disaster recovery.
 
-As for the business continuity on the hardware front, I have a laptop and several mini computers in my possession. I am a huge sucker for the [Minisforum](https://www.minisforum.com/) machines, you can pack some serious hardware in that small box. I figured most offices in case a role is not fully remote will offer me a screen and keyboard anyways.
+As for the business continuity on the hardware front, I have a laptop and several mini computers in my possession. I am a huge sucker for the [Minisforum](https://www.minisforum.com/) machines, you can pack some serious hardware in that small box. I figured most offices will offer me a screen and keyboard anyways in case a role is not fully remote.
 
 ### Software
 
@@ -85,7 +85,7 @@ This user-specific playbook installs per user the non-global roles, such as the 
 
 There are a number of test scenarios possible to evaluate your BC/DR routine. The simplest is a tabletop exercise where you go over your plan without executing any of the steps. This approach serves as a refresher but is also prone to omission of important considerations.
 
-On the other far end is a live test. This is the most work intensive, at least the first time around. You will however learn the most and be able to refine the BC/DR process, making it quicker for future occurrences. You can check whether you missed any vital configuration, more importantly you to know whether it is any good at all. I recommend performing a live test once a year. The feedback will aid in keeping the process up to date, both code-  and documentation-wise. Another advantage of the live test is gauging whether it meets the RTO and RPO objectives you set out to achieve.
+On the other far end is a live test. This is the most work intensive, at least the first time around. You will however learn the most and be able to refine the BC/DR process, making it quicker for future occurrences. You can check whether you missed any vital configuration, more importantly you get to know whether it is any good at all. I recommend performing a live test once a year. The feedback will aid in keeping the process up to date, both code-  and documentation-wise. Another advantage of the live test is gauging whether it meets the RTO and RPO objectives you set out to achieve.
 
 # Wrap up
 

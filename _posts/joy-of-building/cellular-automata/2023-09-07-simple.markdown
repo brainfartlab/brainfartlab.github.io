@@ -81,7 +81,7 @@ We decided to adopt the following assumptions:
 
 The bitvec library offers some nice macros to represent bit vectors, which we made handy use of in our unit testing module. In the end, our implementation stores the rule as the rule index, the integer is sufficient to be able to perform the necessary computations. There is no need to unpack it and come up with elaborate data structures, unlike in later automata. The code to apply the rule is
 
-```rust
+{% highlight rust %}
 impl Rule<EmptyState> for BasicRule {
     fn apply(&self, _: &mut EmptyState, universe: &mut Universe) {
         // the window mask helps us consider only the cells/bits in the window
@@ -115,7 +115,7 @@ impl Rule<EmptyState> for BasicRule {
         bits.rotate_left(shift);
     }
 }
-```
+{% endhighlight %}
 
 Since we update the cells in place, we use a single integer as a cache to keep track of old values. You will also notice that the first window constructed will have its rightmost cell be the first in the universe. All others cells will be the last (window - 1) of the universe, yet we are using the outcome and writing it to the first cell of the universe. This of course is incorrect, and we end up course correcting at the very end by shifting the whole universe to the left. Doing it this way means we don't have to fiddle with indices too much.
 
@@ -131,7 +131,7 @@ We had the option of using [web-sys](https://crates.io/crates/web-sys) to go a s
 
 ## Elm
 
-Compared to our [QuizCraft](% post_url ../../../../../../../joy-of-building/quiz-craft/2023/07/17/frontend.html) project we lose complexity in the form of multipage functionality and gain some in the form of Javascript interoperability and WebAssembly (not directly in Elm but in Javascript).
+Compared to our [QuizCraft]({% post_url joy-of-building/quiz-craft/2023-07-17-frontend %}) project we lose complexity in the form of multipage functionality and gain some in the form of Javascript interoperability and WebAssembly (not directly in Elm but in Javascript).
 
 ### Custom elements
 

@@ -44,4 +44,4 @@ So without further ado, let's kick off an iterative process of reading, followed
 | Class | Vault | Article |
 |-------|-------|---------|
 | simple | [Link](https://vault.dev.brainfartlab.com/cellular-automata/nks/simple/) | [Link]({% post_url joy-of-building/cellular-automata/2023-09-07-simple %}) |
-| mobile | [Link](https://vault.dev.brainfartlab.com/cellular-automata/nks/mobile/) | WIP |
+| mobile | [Link](https://vault.dev.brainfartlab.com/cellular-automata/nks/mobile/) | [Link]({% post_url joy-of-building/cellular-automata/2023-09-12-mobile %})|
